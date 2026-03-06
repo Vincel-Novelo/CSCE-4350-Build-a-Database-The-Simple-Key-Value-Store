@@ -1,104 +1,101 @@
 import sys
 import os
 
-DATA_FILE = "data.db"
+DATA_FILE = os.path.join(os.getcwd(), "data.db")
 
 class Entry:
     """
-    A class representing a single entry in the database.
+    Represents a key-value entry.
     """
-    def __init__(self, name, value):
+    def __init__(self, name: str, value: str):
         self.name = name
         self.value = value
+
 
 class Database:
     def __init__(self):
         self.entries = []
 
-    def set(self, name, value):
-        """
-        Set a value for a given name. If the name already exists, update its value.
-        """
+    def set(self, name: str, value: str) -> None:
+        """Set or overwrite a value."""
         for entry in self.entries:
             if entry.name == name:
                 entry.value = value
                 return
         self.entries.append(Entry(name, value))
 
-    def get(self, name):
-        """
-        Get the value associated with a given name. Returns None if the name does not exist.
-        """
+    def get(self, name: str):
+        """Return value or None."""
         for entry in self.entries:
             if entry.name == name:
                 return entry.value
         return None
-    
-    def load_from_disk(self):
-        """
-        Load entries from the data file on disk.
-        """
+
+    def load_from_disk(self) -> None:
+        """Load database from file."""
         if not os.path.exists(DATA_FILE):
             return
-        with open(DATA_FILE, 'r') as f:
-            for line in f:
-                line = line.strip()
-                parts = line.split(" ", 2)
 
-                if len(parts) == 3 and parts[0] == 'SET':
+        with open(DATA_FILE, "r") as f:
+            for line in f:
+                parts = line.strip().split(" ", 2)
+
+                if len(parts) == 3 and parts[0] == "SET":
                     self.set(parts[1], parts[2])
 
-    def append_to_disk(self, name, value):
-        """
-        Append a new entry to the data file on disk.
-        """
-        with open(DATA_FILE, 'a') as f:
-            f.write(f'SET {name} {value}\n')
+    def append_to_disk(self, name: str, value: str) -> None:
+        """Append SET operation to disk."""
+        with open(DATA_FILE, "a") as f:
+            f.write(f"SET {name} {value}\n")
             f.flush()
             os.fsync(f.fileno())
 
-    def main():
-        db = Database()
-        db.load_from_disk()
 
-        for line in sys.stdin:
-            line = line.strip()
-            parts = line.split(' ', 2)
+def main():
+    db = Database()
+    db.load_from_disk()
 
-            if len(parts) == 0:
+    for line in sys.stdin:
+        line = line.strip()
+
+        if not line:
+            print("ERROR", flush=True)
+            continue
+
+        parts = line.split(" ", 2)
+        command = parts[0].upper()
+
+        if command == "SET":
+            if len(parts) != 3:
+                print("ERROR", flush=True)
                 continue
 
-            command = parts[0].upper()
+            key, value = parts[1], parts[2]
 
-            if command == 'SET':
-                if len(parts) != 3:
-                    print("Usage: SET <name> <value>")
-                    continue
+            db.set(key, value)
+            db.append_to_disk(key, value)
 
-                key = parts[1]
-                value = parts[2]
+            print("OK", flush=True)
 
-                db.set(key, value)
-                db.append_to_disk(key, value)
-                print("OK")
+        elif command == "GET":
+            if len(parts) != 2:
+                print("ERROR", flush=True)
+                continue
 
-            elif command == 'GET':
-                if len(parts) != 2:
-                    print("ERROR")
-                    continue
+            key = parts[1]
+            value = db.get(key)
 
-                key = parts[1]
-                value = db.get(key)
-                if value is not None:
-                    print(value)
-                else:
-                    print("NULL")
-
-            elif command == 'EXIT':
-                break
-
+            if value is None:
+                print("NULL", flush=True)
             else:
-                print("ERROR")
+                print(value, flush=True)
+
+        elif command == "EXIT":
+            break
+
+        else:
+            print("ERROR", flush=True)
+
 
 if __name__ == "__main__":
-    Database.main()
+    main()
